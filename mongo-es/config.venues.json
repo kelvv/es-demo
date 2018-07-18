@@ -1,0 +1,80 @@
+{
+  "controls": {
+    "mongodbReadCapacity": 1000,
+    "elasticsearchBulkSize": 300
+  },
+  "mongodb": {
+    "url": "mongodb://root:root@192.168.1.173:27017/db?readPreference=primary",
+    "options": {
+      "authSource": "business"
+    }
+  },
+  "elasticsearch": {
+    "options": {
+      "host": "http://localhost:9200",
+      "apiVersion": "5.2"
+    },
+    "indices": [
+      {
+        "index": "venues",
+        "body": {
+          "settings": {
+            "index": {
+              "number_of_shards": 3,
+              "number_of_replicas": 1,
+              "mapper.dynamic": true
+            }
+          }
+        }
+      }
+    ]
+  },
+  "tasks": [
+    {
+      "from": {
+        "phase": "tail",
+        "time":"2017-11-21T04:04:23.010Z"
+      },
+      "extract": {
+        "db": "business",
+        "collection": "venues",
+        "query": {},
+        "projection": {
+          "_id": 1,
+          "name" : 1,
+          "tel" : 1,
+          "address" : 1,
+          "type" : 1,
+          "createdAt" : 1,
+          "updatedAt" : 1,
+          "isValid" : 1,
+          "isDeleted" : 1,
+          "location": 1
+        }
+      },
+      "transform": {
+        "mapping": {
+          "_id": "_id",
+          "name" :"name",
+          "tel" : "tel",
+          "address" : "address",
+          "type" : "type",
+          "createdAt" : "createdAt",
+          "updatedAt" : "updatedAt",
+          "isValid" : "isValid",
+          "isDeleted" : "isDeleted",
+          "location": "location"
+         }
+      },
+      "load": {
+        "index": "venues",
+        "type": "venues",
+        "body": {
+          "dynamic": true,
+          "properties": {
+          }
+        }
+      }
+    }
+  ]
+}

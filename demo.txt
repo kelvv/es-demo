@@ -1,0 +1,172 @@
+1.安装es:
+docker run -itd -p 9200:9200 -p 9300:9300 -e "discovery.type=single-node" elasticsearch
+
+2.安装kibana:
+docker run --name mykibana -e ELASTICSEARCH_URL=http://192.168.199.222:9200 -p 5601:5601 -d kibana
+
+1. 中文分词搜索
+PUT /venues
+{
+  "mappings": {
+    "venues" : {
+      "properties" : {
+        "name" : {
+          "type": "text",
+          "fields": {
+            "cn": {
+              "type": "text",
+              "analyzer": "ik_max_word",
+              "search_analyzer": "ik_max_word"
+            },
+            "en": {
+              "type": "text",
+              "analyzer": "english"
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+GET /venues/venues/_mapping
+
+
+GET /venues/venues/_search
+{
+  "query": {
+    "match": {
+      "name.cn": "糖果"
+    }
+  }
+}
+
+2. 聚合数据搜索
+GET /follow/_search
+{
+    "query": {
+        "bool": {
+            "must": [
+                {
+                    "match": {
+                        "targetId": "5ad99eb6bf2376c17e8123a7"
+                    }
+                }
+            ],
+            "filter": {
+                "range": {
+                    "createdAt": {
+                        "gte": "2018-04-20",
+                        "lte": "2018-04-26"
+                    }
+                }
+            }
+        }
+    },
+    "aggs": {
+        "follows": {
+            "date_histogram": {
+                "field": "createdAt",
+                "interval": "day",
+                "format": "yyyy-MM-dd",
+                "extended_bounds": {
+                    "min": "2018-04-20",
+                    "max": "2018-04-26"
+                }
+            }
+        }
+    }
+}
+
+3. 地理空间排序搜索
+GET venues/venues/_search
+{
+    "query": {
+        "bool": {
+            "must": [
+                {
+                    "match": {
+                        "isValid": 1
+                    }
+                },
+                {
+                    "match": {
+                        "isDeleted": 0
+                    }
+                },
+                {
+                    "term": {
+                        "cityId": "58d1ecade841a18ba5399026"
+                    }
+                }
+            ],
+            "filter": {
+                "geo_distance": {
+                    "distance": "2000km",
+                    "location": {
+                        "lat": 31.2360130240364,
+                        "lon": 121.44686167489
+                    }
+                }
+            }
+        }
+    },
+    "sort": {
+        "_geo_distance": {
+            "location": {
+                "lon": 121.44686167489,
+                "lat": 31.2360130240364
+            },
+            "order": "asc",
+            "unit": "m"
+        }
+    },
+    "size": 20
+}
+
+
+4. 个性化分数搜索
+范围要在当前位置的 5km 以内，啤酒吧是最重要的，可以在里面唱KTV更好，并且对不同用户最好展示不同的结果以增加随机性。
+GET venues/venues/_search
+{
+  "query": {
+    "function_score": {
+      "query":{
+        "geo_distance": {
+          "distance": "5km",
+          "location": {
+            "lat": 31.2360130240364,
+            "lon": 121.44686167489
+          }
+        }
+      },
+      "functions": [
+        {
+          "filter": {
+            "term": {
+              "searchTags.normal": "啤酒吧"
+            }
+          },
+          "weight": 2
+        },
+        {
+          "filter": {
+            "term": {
+              "searchTags.normal": "KTV"
+            }
+          },
+          "weight": 1
+        },
+        {
+          "random_score": {
+            "seed": "$id"
+          }
+        }
+      ],
+      "score_mode": "sum",
+      "boost_mode": "multiply"
+    }
+  }
+}
+
+
